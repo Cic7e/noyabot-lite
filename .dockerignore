@@ -1,0 +1,16 @@
+# IDE and virtual environments
+.venv/
+.idea/
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# Data files (databases, configs)
+data/
+*.db
+*.json
+
+# Documentation and project files
+*.md
+*.yml
