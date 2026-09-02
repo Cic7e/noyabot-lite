@@ -37,19 +37,18 @@ def _render_pmf_histogram(pmf: dict[int, Fraction], predicate=None, max_rows: in
 
 def _render_cdf_table(pmf: dict[int, Fraction], predicate=None, max_rows: int = 20) -> str:
     items = sorted(pmf.items())
+    # Compute cumulative over the full PMF before sampling the displayed rows
+    cum_lookup = {} # it's cumulative but I am immature
+    cum = Fraction(0)
+    for v, p in items:
+        cum += p
+        cum_lookup[v] = cum
+    total = cum
     # If too many outcomes, sample evenly across the range
     if len(items) > max_rows:
         step = len(items) // max_rows
         items = items[::step][:max_rows]
 
-    total = sum(p for _, p in sorted(pmf.items()))
-    # Compute cumulative from the full PMF but only display sampled rows
-    full_items = sorted(pmf.items())
-    cum_lookup = {} # it's cumulative but I am immature
-    cum = Fraction(0)
-    for v, p in full_items:
-        cum += p
-        cum_lookup[v] = cum
     width = max(len(str(v)) for v, _ in items)
     width = max(width, 4)  # at least as wide as "Roll"
     rows = [f"{'Roll':>{width}} | Exactly | At most | At least", f"{'─' * width}─┼─────────┼─────────┼─────────"]

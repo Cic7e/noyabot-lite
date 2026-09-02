@@ -8,7 +8,6 @@ from itertools import combinations_with_replacement
 from utils.dice_engine.main_helper import safe_eval
 
 MAX_OUTCOMES = 100_000
-MAX_DICE_FOR_KEEP = 30
 MAX_CONVOLUTION_WORK = 10_000_000
 PMF = dict[int, Fraction]  # outcome -> probability
 _TERM_RE = re.compile(r'(\d*)[dD](\d+)(?:(k[hl]?|[hl])(\d+))?')

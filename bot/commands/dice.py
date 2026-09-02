@@ -82,9 +82,6 @@ class DiceCog(commands.Cog):
     def __init__(self, bot: discord.Bot):
         self.bot = bot
 
-    macro = discord.SlashCommandGroup("macro", "Use saved dice macros and random tables!",
-                                      integration_types={discord.IntegrationType.guild_install})
-
     @commands.slash_command(name="roll", description="Roll some dice!",
                                 integration_types={discord.IntegrationType.guild_install,
                                                    discord.IntegrationType.user_install})

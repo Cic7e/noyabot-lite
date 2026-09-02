@@ -89,7 +89,8 @@ def _render(mode: str, results: list[float], predicate, target_human: str | None
                 f"Ended on: {final_str}\n"
                 f"```")
             return (f"{streaks_block}\n{target_block}" if target_block else streaks_block), stats
-    return None, stats
+        case _:
+            raise ValueError(f"Unknown render mode: {mode!r}")
 
 
 class SimulationView(discord.ui.View):

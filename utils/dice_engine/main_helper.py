@@ -1,4 +1,5 @@
 import ast
+import math
 import operator as op
 import random
 import re
@@ -14,6 +15,32 @@ ALLOWED_OPERATORS = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul, ast.Div
 ALLOWED_NODES = [ast.Expression, ast.BinOp, ast.UnaryOp, ast.Constant, *ALLOWED_OPERATORS.keys()]
 VALID_MATH_PATTERN = re.compile(r'^[0-9+\-*/^()\s]+$')
 DICE_PATTERN_STR = r'(?:[\d.]|\([^)]+\))*[dD](?:[\d.]|\([^)]+\))+(?:(?:k[hl]?|[hl])(?:[\d.]|\([^)]+\))*)?'
+MAX_RESULT_DIGITS = 30
+MAX_ABS_VALUE = 10 ** MAX_RESULT_DIGITS
+
+
+
+def _guard_value(value):
+    if isinstance(value, float):
+        if math.isinf(value) or math.isnan(value):
+            raise ValueError("Result is not a usable number")
+    elif isinstance(value, int) and abs(value) > MAX_ABS_VALUE:
+        raise ValueError(f"Result too large (max {MAX_RESULT_DIGITS} digits)")
+    return value
+
+
+def _safe_pow(base, exp):
+    # Estimate the size of base**exp before computing it
+    if base < 0 and not (isinstance(exp, int) or float(exp).is_integer()):
+        raise ValueError("Negative base with a fractional exponent gives a complex result")
+    if base not in (-1, 0, 1) and exp != 0:
+        magnitude = exp * math.log10(abs(base)) # ~log10 of the result
+        if magnitude > MAX_RESULT_DIGITS:
+            raise ValueError(f"{base:g}^{exp:g} is far too large to compute")
+    try:
+        return base ** exp
+    except OverflowError:
+        raise ValueError("Result too large") from None
 
 
 def roll_dice(num_dice: int, num_sides: int) -> tuple[int, list[int]]:
@@ -39,12 +66,16 @@ def safe_eval(expression: str):
         match node:
             case ast.Constant(value=value):
                 if not isinstance(value, (int, float)):
-                    raise ValueError("Only numeric constants are allowed.")
-                return value
+                    raise ValueError("Only numeric constants are allowed")
+                return _guard_value(value)
             case ast.BinOp(left=left, op=op_type, right=right):
-                return ALLOWED_OPERATORS[type(op_type)](_eval_node(left), _eval_node(right))
+                left_value = _eval_node(left)
+                right_value = _eval_node(right)
+                if isinstance(op_type, ast.Pow):
+                    return _guard_value(_safe_pow(left_value, right_value))
+                return _guard_value(ALLOWED_OPERATORS[type(op_type)](left_value, right_value))
             case ast.UnaryOp(op=op_type, operand=operand):
-                return ALLOWED_OPERATORS[type(op_type)](_eval_node(operand))
+                return _guard_value(ALLOWED_OPERATORS[type(op_type)](_eval_node(operand)))
             case ast.Expression(body=body):
                 return _eval_node(body)
             case _:
@@ -57,17 +88,15 @@ def parse_and_roll(dice_string: str, sort: bool = False) -> tuple[str, str]:
     def roll_callback(match):
         full_match = match.group(0)
         # Check for keep highest/lowest
-        keep_type = None
-        keep_count_str = None
         keep_match = re.search(r'(?i)(k[hl]?|[hl])', full_match)
         if keep_match:
             keep_str = keep_match.group(1).lower()
             keep_type = 'kl' if 'l' in keep_str else 'kh'
             base_dice = full_match[:keep_match.start()]
-            keep_count_str = full_match[keep_match.end():]
-            if not keep_count_str:
-                keep_count_str = "1"
+            keep_count_str = full_match[keep_match.end():] or "1"
         else:
+            keep_type = None
+            keep_count_str = None
             base_dice = full_match
         sep = 'd' if 'd' in base_dice else 'D'
         parts = base_dice.split(sep, 1)
@@ -130,8 +159,9 @@ def parse_and_roll(dice_string: str, sort: bool = False) -> tuple[str, str]:
 
     sanitized_for_calc = re.sub(DICE_PATTERN_STR, roll_callback, dice_string, flags=re.IGNORECASE)
     operators = re.split(DICE_PATTERN_STR, dice_string, flags=re.IGNORECASE)
-    result_parts = [part + o for part, o in zip(breakdown_parts, operators)]
-    full_breakdown = "".join(result_parts) + operators[-1]
+    # operators[i] before match i
+    full_breakdown = operators[0] + "".join(
+        part + sep for part, sep in zip(breakdown_parts, operators[1:]))
     return sanitized_for_calc, full_breakdown
 
 def roll_expression(user_input: str, sort: bool = False) -> tuple[float, str]:
